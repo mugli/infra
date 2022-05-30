@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"reflect"
 	"strings"
+
+	"github.com/getkin/kin-openapi/openapi3"
 )
 
 // Validate that the values in the struct are valid according to the validation rules.
@@ -24,6 +26,9 @@ func Validate(req Request) error {
 			return fmt.Errorf("field value must be a pointer, not %v", fv.Kind())
 		}
 		ft := findStructField(value, fv)
+		if ft == nil {
+			return fmt.Errorf("could not locate field for %v", fv.Type())
+		}
 		jsonName := jsonNameFromStructField(ft)
 		if jsonName == "" {
 			continue
@@ -64,6 +69,9 @@ func RulesToMap(req Request) (map[string][]ValidationRule, error) {
 			return nil, fmt.Errorf("field value must be a pointer, not %v", fv.Kind())
 		}
 		ft := findStructField(value, fv)
+		if ft == nil {
+			return nil, fmt.Errorf("could not locate field for %T", fv.Type())
+		}
 		result[ft.Name] = append(result[ft.Name], rule)
 	}
 	return result, nil
@@ -111,4 +119,28 @@ func jsonNameFromStructField(f *reflect.StructField) string {
 		return ""
 	}
 	return name
+}
+
+func StructRule(field Request) ValidationRule {
+	return &structRule{
+		value:   reflect.ValueOf(field),
+		request: field,
+	}
+}
+
+type structRule struct {
+	value   reflect.Value
+	request Request
+}
+
+func (s *structRule) DescribeSchema(*openapi3.Schema) {
+	// Does nothing. Callers should use RulesToMap to the struct directly.
+}
+
+func (s *structRule) validate() error {
+	return Validate(s.request)
+}
+
+func (s *structRule) fieldValue() reflect.Value {
+	return s.value
 }

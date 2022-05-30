@@ -137,10 +137,12 @@ func orderedTagNames() []string {
 // createComponent creates and returns the SchemaRef for a type. If the type is
 // a struct, the definition of the struct is added  to the schemas map.
 func createComponent(schemas openapi3.Schemas, rst reflect.Type) *openapi3.SchemaRef {
+	if rst.Kind() == reflect.Pointer {
+		rst = rst.Elem()
+	}
+
 	//nolint:exhaustive
 	switch rst.Kind() {
-	case reflect.Pointer:
-		return createComponent(schemas, rst.Elem())
 	case reflect.Slice:
 		schema := createComponent(schemas, rst.Elem())
 
@@ -162,7 +164,6 @@ func createComponent(schemas openapi3.Schemas, rst reflect.Type) *openapi3.Schem
 		desc := structDescription{
 			typ:    rst,
 			schema: schema,
-			rules:  nil, // TODO:
 		}
 		for i := 0; i < rst.NumField(); i++ {
 			f := rst.Field(i)
@@ -213,12 +214,24 @@ func buildProperty(f reflect.StructField, t reflect.Type, parent structDescripti
 	if s.Type == "object" {
 		s.Properties = openapi3.Schemas{}
 
+		// TODO: cleanup
+		reqV := reflect.New(t)
+		req, ok := reqV.Interface().(ivalidate.Request)
+		var rules map[string][]ivalidate.ValidationRule
+		if ok {
+			var err error
+			rules, err = ivalidate.RulesToMap(req)
+			if err != nil {
+				panic(err)
+			}
+		}
+
 		for i := 0; i < t.NumField(); i++ {
 			f2 := t.Field(i)
 			desc := structDescription{
 				typ:    t,
 				schema: s,
-				rules:  parent.rules, // TODO: test nested structs
+				rules:  rules, // TODO: test nested structs
 			}
 			s.Properties[getFieldName(f2, t)] = buildProperty(f2, f2.Type, desc)
 		}
