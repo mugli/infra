@@ -80,3 +80,7 @@ func IsRequired(rules ...ValidationRule) bool {
 type isRequired interface {
 	IsRequired() bool
 }
+
+// TODO: requiredWith
+// TODO: mutuallyExclusive
+// TODO: nested structs

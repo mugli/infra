@@ -1,6 +1,7 @@
 package api
 
 import (
+	"github.com/infrahq/infra/internal/validate"
 	"github.com/infrahq/infra/uid"
 )
 
@@ -34,5 +35,12 @@ type CreateUserResponse struct {
 
 type UpdateUserRequest struct {
 	ID       uid.ID `uri:"id" json:"-" validate:"required"`
-	Password string `json:"password" validate:"required,min=8"`
+	Password string `json:"password"`
+}
+
+func (r *UpdateUserRequest) ValidationRules() []validate.ValidationRule {
+	return []validate.ValidationRule{
+		validate.Required(&r.Password),
+		&validate.StringRule{Field: &r.Password, MinLength: 8},
+	}
 }

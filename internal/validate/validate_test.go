@@ -3,9 +3,11 @@ package validate
 import (
 	"errors"
 	"reflect"
+	"sync"
 	"testing"
 
 	gocmp "github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"gotest.tools/v3/assert"
 )
 
@@ -16,6 +18,11 @@ type ExampleRequest struct {
 func (r *ExampleRequest) ValidationRules() []ValidationRule {
 	return []ValidationRule{
 		Required(&r.RequiredString),
+		&StringRule{
+			Field:     &r.RequiredString,
+			MinLength: 2,
+			MaxLength: 10,
+		},
 	}
 }
 
@@ -50,14 +57,18 @@ func TestRulesToMap(t *testing.T) {
 	rules, err := RulesToMap(r)
 	assert.NilError(t, err)
 	expected := map[string][]ValidationRule{
-		"RequiredString": {list[0]},
+		"RequiredString": {list[0], list[1]},
 	}
 	assert.DeepEqual(t, rules, expected, cmpValidationRules)
 }
 
 var cmpValidationRules = gocmp.Options{
 	gocmp.AllowUnexported(requiredRule{}),
+	cmpopts.IgnoreUnexported(sync.Once{}, StringRule{}),
 	gocmp.Comparer(func(x, y reflect.Value) bool {
+		if x.IsValid() || y.IsValid() {
+			return x.IsValid() == y.IsValid()
+		}
 		return x.Interface() == y.Interface()
 	}),
 }
