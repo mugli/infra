@@ -17,6 +17,7 @@ import (
 
 	"github.com/infrahq/infra/api"
 	"github.com/infrahq/infra/internal"
+	ivalidate "github.com/infrahq/infra/internal/validate"
 )
 
 var (
@@ -158,9 +159,14 @@ func createComponent(schemas openapi3.Schemas, rst reflect.Type) *openapi3.Schem
 		name = strings.ReplaceAll(name, "[", "_")
 		name = strings.ReplaceAll(name, "]", "")
 
+		desc := structDescription{
+			typ:    rst,
+			schema: schema,
+			rules:  nil, // TODO:
+		}
 		for i := 0; i < rst.NumField(); i++ {
 			f := rst.Field(i)
-			schema.Properties[getFieldName(f, rst)] = buildProperty(f, f.Type, rst, schema)
+			schema.Properties[getFieldName(f, rst)] = buildProperty(f, f.Type, desc)
 		}
 
 		if _, ok := schemas[name]; ok {
@@ -178,17 +184,30 @@ func createComponent(schemas openapi3.Schemas, rst reflect.Type) *openapi3.Schem
 	}
 }
 
-func buildProperty(f reflect.StructField, t, parent reflect.Type, parentSchema *openapi3.Schema) *openapi3.SchemaRef {
+type structDescription struct {
+	typ    reflect.Type
+	schema *openapi3.Schema
+	rules  map[string][]ivalidate.ValidationRule
+}
+
+func buildProperty(f reflect.StructField, t reflect.Type, parent structDescription) *openapi3.SchemaRef {
 	if t.Kind() == reflect.Pointer {
-		return buildProperty(f, t.Elem(), parent, parentSchema)
+		t = t.Elem()
 	}
 
 	s := &openapi3.Schema{}
-	setTagInfo(f, t, parent, s, parentSchema)
+	setTagInfo(f, t, parent.typ, s, parent.schema)
 	setTypeInfo(t, s)
 
+	for _, rule := range parent.rules[f.Name] {
+		rule.DescribeSchema(s)
+	}
+	if ivalidate.IsRequired(parent.rules[f.Name]...) {
+		parent.schema.Required = append(parent.schema.Required, getFieldName(f, parent.typ))
+	}
+
 	if s.Type == "array" {
-		s.Items = buildProperty(f, t.Elem(), parent, parentSchema)
+		s.Items = buildProperty(f, t.Elem(), parent)
 	}
 
 	if s.Type == "object" {
@@ -196,13 +215,16 @@ func buildProperty(f reflect.StructField, t, parent reflect.Type, parentSchema *
 
 		for i := 0; i < t.NumField(); i++ {
 			f2 := t.Field(i)
-			s.Properties[getFieldName(f2, t)] = buildProperty(f2, f2.Type, t, s)
+			desc := structDescription{
+				typ:    t,
+				schema: s,
+				rules:  parent.rules, // TODO: test nested structs
+			}
+			s.Properties[getFieldName(f2, t)] = buildProperty(f2, f2.Type, desc)
 		}
 	}
 
-	return &openapi3.SchemaRef{
-		Value: s,
-	}
+	return &openapi3.SchemaRef{Value: s}
 }
 
 func writeOpenAPISpec(spec openapi3.T, out io.Writer) error {
@@ -426,6 +448,19 @@ func buildRequest(r reflect.Type, op *openapi3.Operation) {
 		buildRequest(r.Elem(), op)
 		return
 	case reflect.Struct:
+		// TODO: cleanup
+		reqV := reflect.New(r)
+		req, ok := reqV.Interface().(ivalidate.Request)
+		var rules map[string][]ivalidate.ValidationRule
+		if ok {
+			var err error
+			rules, err = ivalidate.RulesToMap(req)
+			if err != nil {
+				panic(err)
+			}
+		}
+
+		desc := structDescription{typ: r, schema: schema, rules: rules}
 		for i := 0; i < r.NumField(); i++ {
 			f := r.Field(i)
 
@@ -433,7 +468,7 @@ func buildRequest(r reflect.Type, op *openapi3.Operation) {
 			if name, ok := f.Tag.Lookup("json"); ok {
 				jsonName := strings.Split(name, ",")[0]
 				if jsonName != "-" {
-					prop := buildProperty(f, f.Type, r, schema)
+					prop := buildProperty(f, f.Type, desc)
 
 					schema.Properties[jsonName] = prop
 
@@ -444,7 +479,7 @@ func buildRequest(r reflect.Type, op *openapi3.Operation) {
 			// if not, it's a query or uri parameter
 			p := &openapi3.Parameter{
 				Name:     getFieldName(f, r),
-				Schema:   buildProperty(f, f.Type, r, nil),
+				Schema:   buildProperty(f, f.Type, structDescription{typ: r, rules: rules}),
 				Required: false,
 				In:       "",
 			}
@@ -492,6 +527,13 @@ func buildRequest(r reflect.Type, op *openapi3.Operation) {
 						schema.Enum = parseOneOf(val)
 					}
 				}
+			}
+
+			for _, rule := range rules[f.Name] {
+				rule.DescribeSchema(p.Schema.Value)
+			}
+			if ivalidate.IsRequired(rules[f.Name]...) {
+				p.Required = true
 			}
 
 			op.AddParameter(p)

@@ -7,26 +7,24 @@ import (
 	"strings"
 )
 
-// ValidateStruct validates that the values in the struct are valid according
-// to the passed validation rules.
-// If validation fails, the error will be of type Error.
-// TODO: maybe un-export
-func ValidateStruct(structPtr interface{}, rules ...ValidationRule) error {
-	value := reflect.ValueOf(structPtr)
+// Validate that the values in the struct are valid according to the validation rules.
+// If validation fails the error will be of type Error.
+func Validate(req Request) error {
+	value := reflect.ValueOf(req)
 	if value.Kind() != reflect.Ptr || value.Elem().Kind() != reflect.Struct {
-		return fmt.Errorf("struct argument must be pointer to struct, not %T", structPtr)
+		return fmt.Errorf("request argument must be pointer to struct, not %T", req)
 	}
 	value = value.Elem()
 
 	fieldErrors := make(map[string][]string)
 
-	for _, rule := range rules {
+	for _, rule := range req.ValidationRules() {
 		fv := rule.fieldValue()
 		if fv.Kind() != reflect.Ptr {
 			return fmt.Errorf("field value must be a pointer, not %v", fv.Kind())
 		}
 		ft := findStructField(value, fv)
-		jsonName := fieldNameFromStructField(ft)
+		jsonName := jsonNameFromStructField(ft)
 		if jsonName == "" {
 			continue
 		}
@@ -47,6 +45,28 @@ func ValidateStruct(structPtr interface{}, rules ...ValidationRule) error {
 		return Error{FieldErrors: fieldErrors}
 	}
 	return nil
+}
+
+// RulesToMap translates creates a map of validation rules, where the key is
+// the struct field name (not the JSON field name), that the rules apply to.
+// TODO: maybe accept the reflect.Value instead.
+func RulesToMap(req Request) (map[string][]ValidationRule, error) {
+	value := reflect.ValueOf(req)
+	if value.Kind() != reflect.Ptr || value.Elem().Kind() != reflect.Struct {
+		return nil, fmt.Errorf("request argument must be pointer to struct, not %T", req)
+	}
+	value = value.Elem()
+
+	result := make(map[string][]ValidationRule)
+	for _, rule := range req.ValidationRules() {
+		fv := rule.fieldValue()
+		if fv.Kind() != reflect.Ptr {
+			return nil, fmt.Errorf("field value must be a pointer, not %v", fv.Kind())
+		}
+		ft := findStructField(value, fv)
+		result[ft.Name] = append(result[ft.Name], rule)
+	}
+	return result, nil
 }
 
 // findStructField looks for a field by pointer address in the structValue.
@@ -81,7 +101,7 @@ func findStructField(structValue reflect.Value, fieldValue reflect.Value) *refle
 }
 
 // TODO: test cases (name in tag, empty name in tag, no tag, "-" tag)
-func fieldNameFromStructField(f *reflect.StructField) string {
+func jsonNameFromStructField(f *reflect.StructField) string {
 	tag := f.Tag.Get("json")
 	name, _, _ := strings.Cut(tag, ",")
 	switch name {

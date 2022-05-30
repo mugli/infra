@@ -2,8 +2,10 @@ package validate
 
 import (
 	"errors"
+	"reflect"
 	"testing"
 
+	gocmp "github.com/google/go-cmp/cmp"
 	"gotest.tools/v3/assert"
 )
 
@@ -40,4 +42,22 @@ func TestValidate_Failed(t *testing.T) {
 		},
 	}
 	assert.DeepEqual(t, fieldError, expected)
+}
+
+func TestRulesToMap(t *testing.T) {
+	r := &ExampleRequest{}
+	list := r.ValidationRules()
+	rules, err := RulesToMap(r)
+	assert.NilError(t, err)
+	expected := map[string][]ValidationRule{
+		"RequiredString": {list[0]},
+	}
+	assert.DeepEqual(t, rules, expected, cmpValidationRules)
+}
+
+var cmpValidationRules = gocmp.Options{
+	gocmp.AllowUnexported(requiredRule{}),
+	gocmp.Comparer(func(x, y reflect.Value) bool {
+		return x.Interface() == y.Interface()
+	}),
 }

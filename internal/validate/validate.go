@@ -9,7 +9,7 @@ import (
 )
 
 type ValidationRule interface {
-	DescribeSchema(schema openapi3.Schema)
+	DescribeSchema(schema *openapi3.Schema)
 
 	validate() error
 	fieldValue() reflect.Value
@@ -18,11 +18,6 @@ type ValidationRule interface {
 // Request is implemented by all request structs
 type Request interface {
 	ValidationRules() []ValidationRule
-}
-
-// Validate a request. If validation fails the error will be of type Error.
-func Validate(req Request) error {
-	return ValidateStruct(req, req.ValidationRules()...)
 }
 
 type Error struct {
@@ -53,8 +48,11 @@ func Required(field any) ValidationRule {
 	return requiredRule{value: reflect.ValueOf(field)}
 }
 
-func (r requiredRule) DescribeSchema(schema openapi3.Schema) {
-	// TODO: required fields must be set on the parent schema in openapi3 spec
+func (r requiredRule) DescribeSchema(*openapi3.Schema) {
+}
+
+func (r requiredRule) IsRequired() bool {
+	return true
 }
 
 func (r requiredRule) validate() error {
@@ -67,4 +65,18 @@ func (r requiredRule) validate() error {
 
 func (r requiredRule) fieldValue() reflect.Value {
 	return r.value
+}
+
+// IsRequired returns true if any of the rules indicate the value of the field is
+// required.
+func IsRequired(rules ...ValidationRule) bool {
+	for _, rule := range rules {
+		required, ok := rule.(isRequired)
+		return ok && required.IsRequired()
+	}
+	return false
+}
+
+type isRequired interface {
+	IsRequired() bool
 }

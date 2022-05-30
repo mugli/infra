@@ -1,6 +1,7 @@
 package api
 
 import (
+	"github.com/infrahq/infra/internal/validate"
 	"github.com/infrahq/infra/uid"
 )
 
@@ -21,10 +22,18 @@ type ListAccessKeysRequest struct {
 }
 
 type CreateAccessKeyRequest struct {
-	UserID            uid.ID   `json:"userID" validate:"required"`
+	UserID            uid.ID   `json:"userID"`
 	Name              string   `json:"name" validate:"excludes= "`
-	TTL               Duration `json:"ttl" validate:"required" note:"maximum time valid"`
-	ExtensionDeadline Duration `json:"extensionDeadline,omitempty" validate:"required" note:"How long the key is active for before it needs to be renewed. The access key must be used within this amount of time to renew validity"`
+	TTL               Duration `json:"ttl" note:"maximum time valid"`
+	ExtensionDeadline Duration `json:"extensionDeadline,omitempty" note:"How long the key is active for before it needs to be renewed. The access key must be used within this amount of time to renew validity"`
+}
+
+func (r *CreateAccessKeyRequest) ValidationRules() []validate.ValidationRule {
+	return []validate.ValidationRule{
+		validate.Required(&r.UserID),
+		validate.Required(&r.TTL),
+		validate.Required(&r.ExtensionDeadline),
+	}
 }
 
 type CreateAccessKeyResponse struct {
