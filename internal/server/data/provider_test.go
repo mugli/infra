@@ -6,7 +6,6 @@ import (
 	"gorm.io/gorm"
 	"gotest.tools/v3/assert"
 
-	"github.com/infrahq/infra/internal"
 	"github.com/infrahq/infra/internal/server/models"
 )
 
@@ -42,7 +41,7 @@ func TestCreateProviderDuplicate(t *testing.T) {
 		createProviders(t, db, providerDevelop, providerProduction)
 
 		err := CreateProvider(db, &providerDevelop)
-		assert.ErrorIs(t, err, internal.ErrDuplicate)
+		assert.ErrorContains(t, err, "value for name already exists in providers")
 	})
 }
 

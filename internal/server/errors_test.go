@@ -47,17 +47,6 @@ func TestSendAPIError(t *testing.T) {
 			result: api.Error{Code: http.StatusForbidden, Message: "forbidden"},
 		},
 		{
-			err:    internal.ErrDuplicate,
-			result: api.Error{Code: http.StatusConflict, Message: "duplicate record"},
-		},
-		{
-			err: fmt.Errorf("%w: nope too many", internal.ErrDuplicate),
-			result: api.Error{
-				Code:    http.StatusConflict,
-				Message: "duplicate record: nope too many",
-			},
-		},
-		{
 			err:    internal.ErrNotFound,
 			result: api.Error{Code: http.StatusNotFound, Message: "record not found"},
 		},
