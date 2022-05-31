@@ -1,5 +1,16 @@
 # Changelog
 
+### [0.13.2](https://github.com/infrahq/infra/compare/v0.13.1...v0.13.2) (2022-05-31)
+
+
+### Bug Fixes
+
+* fix auth ui redirects for new otp users ([#2091](https://github.com/infrahq/infra/issues/2091)) ([e8744ad](https://github.com/infrahq/infra/commit/e8744ad82840780e8c1720a456c11fcf88f64df8))
+* infra default role is no role ([#2148](https://github.com/infrahq/infra/issues/2148)) ([e40a202](https://github.com/infrahq/infra/commit/e40a20298815988da316128c9b89573ec8faffe4))
+* release build should not contain dev ([f26db74](https://github.com/infrahq/infra/commit/f26db74ea62fb61f5742a00fa8ed26ca22f8eb91))
+* ui bugs ([#2120](https://github.com/infrahq/infra/issues/2120)) ([128bd01](https://github.com/infrahq/infra/commit/128bd017afd54b104ff8c85646f2e43901a4ba84))
+* ui bugs ([#2142](https://github.com/infrahq/infra/issues/2142)) ([66ef1b9](https://github.com/infrahq/infra/commit/66ef1b964ddbf92f1f861ffeabb151fd4b95c9ae))
+
 ### [0.13.1](https://github.com/infrahq/infra/compare/v0.13.0...v0.13.1) (2022-05-27)
 
 
